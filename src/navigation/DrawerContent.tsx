@@ -6,28 +6,32 @@ import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { colors } from '../theme';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { SCREEN } from '../constants/routes';
+import { usePermission } from '../context/PermissionProvider';
 
-interface MenuItem {
+interface DrawerItem {
   label: string;
   icon: string;
   screen: string;
 }
 
-const menuItems: MenuItem[] = [
-  { label: 'Dashboard', icon: 'view-dashboard-outline', screen: SCREEN.DASHBOARD },
-  { label: 'Employees', icon: 'account-group-outline', screen: SCREEN.EMPLOYEE_LIST },
-  { label: 'Clients', icon: 'domain', screen: SCREEN.CLIENT_LIST },
-  { label: 'Tasks', icon: 'clipboard-check-outline', screen: SCREEN.TASKS },
-  { label: 'Timesheet', icon: 'clock-outline', screen: SCREEN.TIMESHEET },
-  { label: 'Attendance', icon: 'calendar-check-outline', screen: SCREEN.ATTENDANCE },
-  { label: 'Reports', icon: 'chart-bar', screen: SCREEN.EMPLOYEE_REPORT },
-  { label: 'Services', icon: 'cog-outline', screen: SCREEN.SERVICES },
-  { label: 'Client Types', icon: 'tag-outline', screen: SCREEN.CLIENT_TYPES },
-  { label: 'Roles', icon: 'shield-account-outline', screen: SCREEN.ROLES },
-];
-
 const DrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { menuItems: permissionMenuItems } = usePermission();
+
+  // Flatten permission-based menu items into a flat list for the drawer
+  const drawerItems: DrawerItem[] = React.useMemo(() => {
+    const items: DrawerItem[] = [];
+    permissionMenuItems.forEach((item) => {
+      if (item.children && item.children.length > 0) {
+        item.children.forEach((child) => {
+          items.push({ label: child.title, icon: item.icon, screen: child.screen });
+        });
+      } else if (item.screen) {
+        items.push({ label: item.title, icon: item.icon, screen: item.screen });
+      }
+    });
+    return items;
+  }, [permissionMenuItems]);
 
   const initials = user?.name
     ? user.name
@@ -66,7 +70,7 @@ const DrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation }) =>
 
       {/* Menu Items */}
       <ScrollView style={styles.menuList}>
-        {menuItems.map((item) => (
+        {drawerItems.map((item) => (
           <TouchableRipple
             key={item.screen}
             onPress={() => handleNavigate(item.screen)}

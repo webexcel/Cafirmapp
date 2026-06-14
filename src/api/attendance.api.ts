@@ -14,6 +14,6 @@ export const attendanceApi = {
   getByDate: (data: any) =>
     api.post(`${EP.ATTENDANCE}/getAttendanceByDate`, data),
 
-  checkToday: (data: { employee_id: number }) =>
+  checkToday: (data: { emp_id: number }) =>
     api.post(`${EP.ATTENDANCE}/checkTodayAttendance`, data),
 };

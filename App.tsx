@@ -1,5 +1,5 @@
-import React from 'react';
-import { StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
+import { Platform, PermissionsAndroid, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { Provider as StoreProvider } from 'react-redux';
@@ -14,7 +14,21 @@ import { paperTheme, navigationTheme, colors } from './src/theme';
 import { PermissionProvider } from './src/context/PermissionProvider';
 import RootNavigator from './src/navigation/RootNavigator';
 
-const App: React.FC = () => (
+const App: React.FC = () => {
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'This app needs access to your location for attendance tracking.',
+          buttonPositive: 'OK',
+        },
+      );
+    }
+  }, []);
+
+  return (
   <GestureHandlerRootView style={{ flex: 1 }}>
     <StoreProvider store={store}>
       <QueryClientProvider client={queryClient}>
@@ -36,5 +50,7 @@ const App: React.FC = () => (
     <Toast />
   </GestureHandlerRootView>
 );
+
+};
 
 export default App;

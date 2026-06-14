@@ -13,12 +13,16 @@ import ConfirmDialog from '../../../components/ConfirmDialog';
 import OverlayLoader from '../../../components/OverlayLoader';
 import { useTasks } from '../hooks/useTasks';
 import { formatDate } from '../../../utils/dateFormat';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const statusFilters = ['All', 'Pending', 'In Progress', 'Completed'];
 const statusMap: Record<string, string> = { Pending: '0', 'In Progress': '1', Completed: '2' };
 
 const TaskListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { getOperationFlagsById } = usePermission();
+  const viewFlags = getOperationFlagsById(10, 2);
+  const createFlags = getOperationFlagsById(10, 1);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -87,13 +91,15 @@ const TaskListScreen: React.FC = () => {
           <StatusBadge status={item.priority.toLowerCase()} label={item.priority} />
         )}
         <View style={{ flex: 1 }} />
-        <IconButton
-          icon="delete-outline"
-          iconColor={colors.error}
-          size={18}
-          onPress={() => setDeleteId(item.task_id)}
-          style={{ margin: 0 }}
-        />
+        {viewFlags.showDELETE && (
+          <IconButton
+            icon="delete-outline"
+            iconColor={colors.error}
+            size={18}
+            onPress={() => setDeleteId(item.task_id)}
+            style={{ margin: 0 }}
+          />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -135,12 +141,14 @@ const TaskListScreen: React.FC = () => {
         }
       />
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => navigation.navigate(SCREEN.CREATE_TASK)}
-        color="#FFF"
-      />
+      {createFlags.showCREATE && (
+        <FAB
+          icon="plus"
+          style={styles.fab}
+          onPress={() => navigation.navigate(SCREEN.CREATE_TASK)}
+          color="#FFF"
+        />
+      )}
 
       <ConfirmDialog
         visible={!!deleteId}

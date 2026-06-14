@@ -13,6 +13,7 @@ import { useEmployees } from '../hooks/useEmployees';
 import { permissionsApi } from '../../../api/permissions.api';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const schema = yup.object({
   name: yup.string().required('Name is required'),
@@ -25,6 +26,8 @@ const CreateEmployeeScreen: React.FC = () => {
   const navigation = useNavigation();
   const { addMutation } = useEmployees();
   const user = useSelector((s: RootState) => s.auth.user);
+  const { getOperationFlagsById } = usePermission();
+  const createFlags = getOperationFlagsById(3, 1);
   const [roles, setRoles] = useState<any[]>([]);
   const [roleMenuVisible, setRoleMenuVisible] = useState(false);
 
@@ -38,6 +41,21 @@ const CreateEmployeeScreen: React.FC = () => {
   }, []);
 
   const selectedRole = roles.find((r) => String(r.permission_id) === watch('role'));
+
+  if (!createFlags.showCREATE) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Add Employee" showBack showDrawer={false} />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to create employees.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const onSubmit = (data: any) => {
     addMutation.mutate(
@@ -157,6 +175,10 @@ const styles = StyleSheet.create({
   },
   dropdownText: { fontSize: 14, color: colors.text },
   submitBtn: { marginTop: 24, borderRadius: 8, backgroundColor: colors.primary },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default CreateEmployeeScreen;

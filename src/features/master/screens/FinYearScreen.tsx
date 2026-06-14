@@ -1,12 +1,17 @@
 import React from 'react';
 import MasterCrudScreen from '../../../components/MasterCrudScreen';
 import { useFinYears } from '../hooks/useMaster';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const FinYearScreen: React.FC = () => {
   const { list, addMutation, deleteMutation } = useFinYears();
+  const { getOperationFlagsById } = usePermission();
+  const flags = getOperationFlagsById(17, 1);
 
   return (
     <MasterCrudScreen
+      showAdd={!!flags.showCREATE}
+      showDelete={!!flags.showDELETE}
       title="Financial Years"
       fieldLabel="Year"
       fieldKey="year"

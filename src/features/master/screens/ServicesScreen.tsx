@@ -1,12 +1,17 @@
 import React from 'react';
 import MasterCrudScreen from '../../../components/MasterCrudScreen';
 import { useServices } from '../hooks/useMaster';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const ServicesScreen: React.FC = () => {
   const { list, addMutation, deleteMutation } = useServices();
+  const { getOperationFlagsById } = usePermission();
+  const flags = getOperationFlagsById(17, 1);
 
   return (
     <MasterCrudScreen
+      showAdd={!!flags.showCREATE}
+      showDelete={!!flags.showDELETE}
       title="Services"
       fieldLabel="Service Name"
       fieldKey="service_name"

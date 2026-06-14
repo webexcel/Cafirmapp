@@ -22,11 +22,14 @@ interface MasterCrudScreenProps {
   onDelete: (item: any) => void;
   isAdding: boolean;
   isDeleting: boolean;
+  showAdd?: boolean;
+  showDelete?: boolean;
 }
 
 const MasterCrudScreen: React.FC<MasterCrudScreenProps> = ({
   title, fieldLabel, fieldKey, secondaryFieldLabel, secondaryFieldKey,
   data, isLoading, isRefetching, onRefresh, onAdd, onDelete, isAdding, isDeleting,
+  showAdd = true, showDelete = true,
 }) => {
   const [newValue, setNewValue] = useState('');
   const [newSecondary, setNewSecondary] = useState('');
@@ -68,13 +71,15 @@ const MasterCrudScreen: React.FC<MasterCrudScreenProps> = ({
       {secondaryFieldKey && (
         <Text style={styles.itemSecondary} numberOfLines={1}>{item[secondaryFieldKey]}</Text>
       )}
-      <IconButton
-        icon="delete-outline"
-        iconColor={colors.error}
-        size={18}
-        onPress={() => setDeleteItem(item)}
-        style={{ margin: 0 }}
-      />
+      {showDelete && (
+        <IconButton
+          icon="delete-outline"
+          iconColor={colors.error}
+          size={18}
+          onPress={() => setDeleteItem(item)}
+          style={{ margin: 0 }}
+        />
+      )}
     </View>
   );
 
@@ -84,34 +89,36 @@ const MasterCrudScreen: React.FC<MasterCrudScreenProps> = ({
       <OverlayLoader visible={isAdding || isDeleting} />
 
       {/* Add Section */}
-      <View style={styles.addSection}>
-        <TextInput
-          mode="outlined"
-          placeholder={`Enter ${fieldLabel.toLowerCase()}`}
-          value={newValue}
-          onChangeText={setNewValue}
-          style={styles.addInput}
-          outlineStyle={styles.outline}
-          outlineColor={colors.border}
-          activeOutlineColor={colors.primary}
-        />
-        {secondaryFieldLabel && (
+      {showAdd && (
+        <View style={styles.addSection}>
           <TextInput
             mode="outlined"
-            placeholder={`Enter ${secondaryFieldLabel.toLowerCase()}`}
-            value={newSecondary}
-            onChangeText={setNewSecondary}
-            style={[styles.addInput, { marginTop: 8 }]}
+            placeholder={`Enter ${fieldLabel.toLowerCase()}`}
+            value={newValue}
+            onChangeText={setNewValue}
+            style={styles.addInput}
             outlineStyle={styles.outline}
             outlineColor={colors.border}
             activeOutlineColor={colors.primary}
           />
-        )}
-        <Button mode="contained" onPress={handleAdd} style={styles.addBtn}
-          contentStyle={{ height: 42 }} icon="plus">
-          Add
-        </Button>
-      </View>
+          {secondaryFieldLabel && (
+            <TextInput
+              mode="outlined"
+              placeholder={`Enter ${secondaryFieldLabel.toLowerCase()}`}
+              value={newSecondary}
+              onChangeText={setNewSecondary}
+              style={[styles.addInput, { marginTop: 8 }]}
+              outlineStyle={styles.outline}
+              outlineColor={colors.border}
+              activeOutlineColor={colors.primary}
+            />
+          )}
+          <Button mode="contained" onPress={handleAdd} style={styles.addBtn}
+            contentStyle={{ height: 42 }} icon="plus">
+            Add
+          </Button>
+        </View>
+      )}
 
       <View style={styles.searchContainer}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search..." />

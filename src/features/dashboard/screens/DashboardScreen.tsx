@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
 import { colors } from '../../../theme';
 import AppHeader from '../../../components/AppHeader';
 import MetricCard from '../../../components/MetricCard';
 import RecentTasks from '../components/RecentTasks';
 import RecentTimesheets from '../components/RecentTimesheets';
+import AttendanceWidget from '../components/AttendanceWidget';
+import UserInfoCard from '../components/UserInfoCard';
 import { useDashboard } from '../hooks/useDashboard';
+import { useAttendance } from '../../attendance/hooks/useAttendance';
+import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
+import { getCurrentLocation, isWithinOffice } from '../../../utils/geolocation';
 
 interface MetricDef {
   title: string;
@@ -16,17 +22,100 @@ interface MetricDef {
 }
 
 const metricDefs: MetricDef[] = [
-  { title: 'Employees', key: 'employee_count', icon: 'account-group-outline', color: colors.accent },
-  { title: 'Clients', key: 'client_count', icon: 'domain', color: '#1ABC9C' },
-  { title: 'Services', key: 'service_count', icon: 'briefcase-outline', color: '#E91E63' },
   { title: 'Pending', key: 'task_pending', icon: 'clock-alert-outline', color: colors.warning },
   { title: 'In Progress', key: 'task_inprogress', icon: 'progress-clock', color: colors.accent },
   { title: 'Completed', key: 'task_completed', icon: 'check-circle-outline', color: colors.success },
-  { title: 'Attendance', key: 'today_attendance', icon: 'calendar-check', color: '#1ABC9C' },
 ];
 
 const DashboardScreen: React.FC = () => {
   const { metrics, recentTasks, recentTimesheets } = useDashboard();
+  const today = formatDateToYYYYMMDD(new Date());
+  const { records, todayCheck, clockIn, clockOut } = useAttendance(today);
+
+  const [isActive, setIsActive] = useState(false);
+  const [currentAttId, setCurrentAttId] = useState<number | null>(null);
+  const [activeElapsedSeconds, setActiveElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const openRecord = todayCheck.data?.data?.[0];
+    if (openRecord && openRecord.logout_time === null) {
+      setIsActive(true);
+      setCurrentAttId(openRecord.attendance_id);
+      // Calculate elapsed seconds from login_time (HH:MM:SS)
+      if (openRecord.login_time) {
+        const parts = openRecord.login_time.split(':').map(Number);
+        const now = new Date();
+        const loginDate = new Date();
+        loginDate.setHours(parts[0] || 0, parts[1] || 0, parts[2] || 0, 0);
+        const diff = Math.max(0, Math.floor((now.getTime() - loginDate.getTime()) / 1000));
+        setActiveElapsedSeconds(diff);
+      }
+    } else {
+      setIsActive(false);
+      setCurrentAttId(null);
+      setActiveElapsedSeconds(0);
+    }
+  }, [todayCheck.data]);
+
+  // Parse today_work_time "HH:MM:SS" into total seconds for accurate display
+  const todayWorkTime = todayCheck.data?.today_work_time || '00:00:00';
+  const twParts = todayWorkTime.split(':').map(Number);
+  const completedSeconds = (twParts[0] || 0) * 3600 + (twParts[1] || 0) * 60 + (twParts[2] || 0);
+
+  const handleToggle = async () => {
+    if (isActive) {
+      if (!currentAttId) {
+        Toast.show({ type: 'error', text1: 'No active session found' });
+        return;
+      }
+      let location = null;
+      try {
+        location = await getCurrentLocation();
+      } catch {
+        // geolocation failed
+      }
+      if (!location) {
+        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to logout' });
+        return;
+      }
+      if (!isWithinOffice(location)) {
+        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to logout' });
+        return;
+      }
+      clockOut.mutate(
+        { att_id: currentAttId, ...location },
+        {
+          onSuccess: () => {
+            setIsActive(false);
+            setCurrentAttId(null);
+            setActiveElapsedSeconds(0);
+          },
+        },
+      );
+    } else {
+      let location = null;
+      try {
+        location = await getCurrentLocation();
+      } catch {
+        // geolocation failed
+      }
+      if (!location) {
+        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to login' });
+        return;
+      }
+      if (!isWithinOffice(location)) {
+        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to login' });
+        return;
+      }
+      clockIn.mutate(location, {
+        onSuccess: (res) => {
+          setCurrentAttId(res.data.data);
+          setIsActive(true);
+          setActiveElapsedSeconds(0);
+        },
+      });
+    }
+  };
 
   const isLoading = metrics.isLoading;
   const isRefreshing = metrics.isRefetching;
@@ -35,6 +124,8 @@ const DashboardScreen: React.FC = () => {
     metrics.refetch();
     recentTasks.refetch();
     recentTimesheets.refetch();
+    todayCheck.refetch();
+    records.refetch();
   };
 
   return (
@@ -53,6 +144,9 @@ const DashboardScreen: React.FC = () => {
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[colors.primary]} />
           }
         >
+          {/* User Info */}
+          <UserInfoCard />
+
           {/* Metric Cards Grid */}
           <View style={styles.metricsGrid}>
             {metricDefs.map((m) => (
@@ -66,6 +160,15 @@ const DashboardScreen: React.FC = () => {
               </View>
             ))}
           </View>
+
+          {/* Attendance Widget */}
+          <AttendanceWidget
+            isActive={isActive}
+            isLoading={clockIn.isPending || clockOut.isPending}
+            completedSeconds={completedSeconds}
+            activeElapsedSeconds={activeElapsedSeconds}
+            onToggle={handleToggle}
+          />
 
           {/* Recent Tasks */}
           {recentTasks.isLoading ? (

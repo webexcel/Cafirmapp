@@ -10,6 +10,7 @@ import AppHeader from '../../../components/AppHeader';
 import OverlayLoader from '../../../components/OverlayLoader';
 import { useClients } from '../hooks/useClients';
 import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const schema = yup.object({
   name: yup.string().required('Name is required'),
@@ -28,6 +29,8 @@ const schema = yup.object({
 const CreateClientScreen: React.FC = () => {
   const navigation = useNavigation();
   const { addMutation, clientTypes } = useClients();
+  const { getOperationFlagsById } = usePermission();
+  const createFlags = getOperationFlagsById(5, 1);
   const [typeMenuVisible, setTypeMenuVisible] = useState(false);
 
   const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm({
@@ -40,6 +43,21 @@ const CreateClientScreen: React.FC = () => {
 
   const selectedType = clientTypes.data?.find((t: any) => String(t.id) === watch('clientType'));
   const today = formatDateToYYYYMMDD(new Date());
+
+  if (!createFlags.showCREATE) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Add Client" showBack showDrawer={false} />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to create clients.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const onSubmit = (data: any) => {
     addMutation.mutate(
@@ -151,6 +169,10 @@ const styles = StyleSheet.create({
   },
   dropdownText: { fontSize: 14, color: colors.text },
   submitBtn: { marginTop: 24, borderRadius: 8, backgroundColor: colors.primary },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default CreateClientScreen;

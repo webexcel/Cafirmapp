@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../app/store';
 import { colors } from '../../../theme';
 import AppHeader from '../../../components/AppHeader';
 import { SCREEN } from '../../../constants/routes';
+import { usePermission } from '../../../context/PermissionProvider';
 
 interface MoreItem {
   label: string;
@@ -51,14 +54,33 @@ const sections: { title: string; items: MoreItem[] }[] = [
   },
 ];
 
+const ADMIN_SCREENS = [SCREEN.ROLES, SCREEN.MENU_CONFIG, SCREEN.OPERATIONS];
+
 const MoreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { hasScreenAccess } = usePermission();
+  const user = useSelector((s: RootState) => s.auth.user);
+
+  const filteredSections = useMemo(() => {
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          // Admin-only screens require role === 1
+          if (ADMIN_SCREENS.includes(item.screen)) {
+            return user?.role === 1;
+          }
+          return hasScreenAccess(item.screen);
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [hasScreenAccess, user?.role]);
 
   return (
     <View style={styles.flex}>
       <AppHeader title="More" />
       <ScrollView contentContainerStyle={styles.content}>
-        {sections.map((section) => (
+        {filteredSections.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.grid}>

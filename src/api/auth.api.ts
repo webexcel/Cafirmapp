@@ -2,7 +2,7 @@ import api from './client';
 import { EP } from './endpoints';
 
 export const authApi = {
-  login: (data: { email: string; password: string }) =>
+  login: (data: { email: string; password: string; device_id: string }) =>
     api.post(`${EP.AUTH}/login`, data),
 
   forgotPassword: (data: { email: string }) =>

@@ -6,13 +6,15 @@ import { storage } from '../../../utils/storage';
 import { authApi } from '../../../api/auth.api';
 import { USER_KEY } from '../../../constants/config';
 import { queryClient } from '../../../app/queryClient';
+import { getDeviceId } from '../../../utils/deviceId';
 
 export const useAuth = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { isLoggedIn, user, isLoading } = useSelector((state: RootState) => state.auth);
 
   const login = async (email: string, password: string) => {
-    const res = await authApi.login({ email, password });
+    const device_id = await getDeviceId();
+    const res = await authApi.login({ email, password, device_id });
     const { token, userdata } = res.data;
     await saveToken(token);
     await storage.setObject(USER_KEY, userdata);

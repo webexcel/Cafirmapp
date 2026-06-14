@@ -15,6 +15,7 @@ import { employeeApi } from '../../../api/employee.api';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
 import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const schema = yup.object({
   taskName: yup.string().required('Task name is required'),
@@ -29,6 +30,8 @@ const CreateTaskScreen: React.FC = () => {
   const navigation = useNavigation();
   const { addMutation } = useTasks();
   const user = useSelector((s: RootState) => s.auth.user);
+  const { getOperationFlagsById } = usePermission();
+  const createFlags = getOperationFlagsById(10, 1);
 
   const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -75,6 +78,21 @@ const CreateTaskScreen: React.FC = () => {
       prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id],
     );
   };
+
+  if (!createFlags.showCREATE) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Create Task" showBack showDrawer={false} />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to create tasks.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const onSubmit = (data: any) => {
     const today = formatDateToYYYYMMDD(new Date());
@@ -204,6 +222,10 @@ const styles = StyleSheet.create({
   empChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   empChipText: { fontSize: 13, color: colors.text },
   submitBtn: { marginTop: 24, borderRadius: 8, backgroundColor: colors.primary },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default CreateTaskScreen;

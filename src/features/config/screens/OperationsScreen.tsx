@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Text, Button, Menu } from 'react-native-paper';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../app/store';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../../theme';
 import AppHeader from '../../../components/AppHeader';
 import EmptyState from '../../../components/EmptyState';
@@ -8,6 +11,8 @@ import OverlayLoader from '../../../components/OverlayLoader';
 import { useOperations, useMenuConfig } from '../hooks/useConfig';
 
 const OperationsScreen: React.FC = () => {
+  const user = useSelector((s: RootState) => s.auth.user);
+  const navigation = useNavigation<any>();
   const { list: menuList } = useMenuConfig();
   const { menuOps, addMutation } = useOperations();
 
@@ -15,6 +20,21 @@ const OperationsScreen: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const selectedMenuName = (menuList.data || []).find((m: any) => String(m.menu_id) === selectedMenu)?.menu_name || '';
+
+  if (user?.role !== 1) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Operations" showBack />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to access this screen.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const handleAssign = () => {
     if (!selectedMenu) return;
@@ -95,6 +115,10 @@ const styles = StyleSheet.create({
   sno: { width: 32, fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   menuName: { fontSize: 14, fontWeight: '600', color: colors.text },
   opsText: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default OperationsScreen;

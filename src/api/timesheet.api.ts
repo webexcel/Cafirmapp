@@ -13,4 +13,7 @@ export const timesheetApi = {
 
   getLimited: () =>
     api.get(`${EP.TIMESHEET}/getTimesheetLimited`),
+
+  updateWeekly: (data: any) =>
+    api.post(`${EP.TIMESHEET}/updateWeeklyTimesheet`, { data }),
 };

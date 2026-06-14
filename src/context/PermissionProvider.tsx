@@ -31,6 +31,7 @@ interface PermissionContextType {
   menuItems: MenuItem[];
   fetchPermissions: () => Promise<void>;
   getOperationFlagsById: (menuId: number, submenuSeq: number) => OperationFlags;
+  hasScreenAccess: (screenName: string) => boolean;
   resetPermissions: () => void;
 }
 
@@ -145,6 +146,17 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [permissions],
   );
 
+  const hasScreenAccess = useCallback(
+    (screenName: string): boolean => {
+      return menuItems.some(
+        (item) =>
+          item.screen === screenName ||
+          item.children?.some((child) => child.screen === screenName),
+      );
+    },
+    [menuItems],
+  );
+
   const resetPermissions = useCallback(() => {
     setPermissions([]);
     setMenuItems([]);
@@ -157,6 +169,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         menuItems,
         fetchPermissions,
         getOperationFlagsById,
+        hasScreenAccess,
         resetPermissions,
       }}
     >

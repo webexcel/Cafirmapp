@@ -9,9 +9,11 @@ import OverlayLoader from '../../../components/OverlayLoader';
 import { useMenuConfig } from '../hooks/useConfig';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
+import { useNavigation } from '@react-navigation/native';
 
 const MenuScreen: React.FC = () => {
   const user = useSelector((s: RootState) => s.auth.user);
+  const navigation = useNavigation<any>();
   const { list, parentMenus, addMutation, deleteMutation } = useMenuConfig();
 
   const [menuType, setMenuType] = useState<'0' | '1'>('0'); // 0=parent, 1=child
@@ -23,6 +25,21 @@ const MenuScreen: React.FC = () => {
   const [deleteItem, setDeleteItem] = useState<any>(null);
 
   const selectedParent = (parentMenus.data || []).find((p: any) => String(p.menu_id) === parentId);
+
+  if (user?.role !== 1) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Menu Config" showBack />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to access this screen.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const handleAdd = () => {
     if (menuType === '0' && !menuName.trim()) return;
@@ -154,6 +171,10 @@ const styles = StyleSheet.create({
   rowEven: { backgroundColor: colors.surface, borderRadius: 8 },
   sno: { width: 32, fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   itemText: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default MenuScreen;

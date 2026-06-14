@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Text, TextInput, Button, IconButton } from 'react-native-paper';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../app/store';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../../theme';
 import AppHeader from '../../../components/AppHeader';
 import SearchBar from '../../../components/SearchBar';
@@ -9,10 +12,27 @@ import OverlayLoader from '../../../components/OverlayLoader';
 import { useRoles } from '../hooks/useConfig';
 
 const RolesScreen: React.FC = () => {
+  const user = useSelector((s: RootState) => s.auth.user);
+  const navigation = useNavigation<any>();
   const { list, addMutation } = useRoles();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [search, setSearch] = useState('');
+
+  if (user?.role !== 1) {
+    return (
+      <View style={styles.flex}>
+        <AppHeader title="Roles" showBack />
+        <View style={styles.accessDenied}>
+          <Text style={styles.accessDeniedText}>Access Denied</Text>
+          <Text style={styles.accessDeniedSub}>You do not have permission to access this screen.</Text>
+          <Button mode="contained" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            Go Back
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   const filtered = (list.data || []).filter((r: any) => {
     if (!search.trim()) return true;
@@ -88,6 +108,10 @@ const styles = StyleSheet.create({
   sno: { width: 32, fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   roleName: { fontSize: 14, fontWeight: '600', color: colors.text },
   roleDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  accessDeniedText: { fontSize: 18, fontWeight: '700', color: colors.error, marginBottom: 8 },
+  accessDeniedSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  backBtn: { borderRadius: 8, backgroundColor: colors.primary },
 });
 
 export default RolesScreen;

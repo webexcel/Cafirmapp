@@ -11,10 +11,14 @@ import EmptyState from '../../../components/EmptyState';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import OverlayLoader from '../../../components/OverlayLoader';
 import { useEmployees } from '../hooks/useEmployees';
+import { usePermission } from '../../../context/PermissionProvider';
 
 const EmployeeListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { list, deleteMutation } = useEmployees();
+  const { getOperationFlagsById } = usePermission();
+  const viewFlags = getOperationFlagsById(3, 2);
+  const createFlags = getOperationFlagsById(3, 1);
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -59,12 +63,14 @@ const EmployeeListScreen: React.FC = () => {
           <Text style={styles.detail}>{item.phone}</Text>
         </View>
       </View>
-      <IconButton
-        icon="delete-outline"
-        iconColor={colors.error}
-        size={20}
-        onPress={() => setDeleteId(item.employee_id)}
-      />
+      {viewFlags.showDELETE && (
+        <IconButton
+          icon="delete-outline"
+          iconColor={colors.error}
+          size={20}
+          onPress={() => setDeleteId(item.employee_id)}
+        />
+      )}
     </TouchableOpacity>
   );
 
@@ -89,12 +95,14 @@ const EmployeeListScreen: React.FC = () => {
         }
       />
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => navigation.navigate(SCREEN.CREATE_EMPLOYEE)}
-        color="#FFF"
-      />
+      {createFlags.showCREATE && (
+        <FAB
+          icon="plus"
+          style={styles.fab}
+          onPress={() => navigation.navigate(SCREEN.CREATE_EMPLOYEE)}
+          color="#FFF"
+        />
+      )}
 
       <ConfirmDialog
         visible={!!deleteId}
