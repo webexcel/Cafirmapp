@@ -10,8 +10,11 @@ import { useAttendanceByDate } from '../hooks/useAttendance';
 import { employeeApi } from '../../../api/employee.api';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
-import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
-import { TextInput } from 'react-native-paper';
+import { formatDateToYYYYMMDD, formatDate } from '../../../utils/dateFormat';
+import DatePickerField from '../../../components/DatePickerField';
+
+// Sentinel for the admin/manager "see everyone" option.
+const ALL_EMPLOYEES = 'ALL';
 
 const ViewAttendanceScreen: React.FC = () => {
   const user = useSelector((s: RootState) => s.auth.user);
@@ -24,29 +27,67 @@ const ViewAttendanceScreen: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [data, setData] = useState<any[]>([]);
 
+  // Only superadmin (role 1) and admin (role 2) may view every employee's
+  // attendance. Matches the backend `isAdmin = role == 1 || role == 2` rule.
+  const isAdminView = user?.role === 1 || user?.role === 2;
+
+  const runSearch = (emp: string) => {
+    if (!emp) return;
+    const from = startDate;
+    const to = endDate;
+    viewAttendance.mutate(
+      {
+        // "" tells the backend to return every employee (admin/manager only).
+        emp_id: emp === ALL_EMPLOYEES ? '' : Number(emp),
+        start_date: from,
+        end_date: to,
+        user_id: user?.employee_id || 0,
+      },
+      {
+        onSuccess: (res) => {
+          // The API filters on created_at, which can leak a record whose
+          // login_date is an adjacent day. Keep only rows whose attendance
+          // date (login_date) is within the selected range, so the table
+          // matches the pickers — today only on the default load.
+          const rows = res.data.data || [];
+          const filtered = rows.filter(
+            (r: any) => !r.login_date || (r.login_date >= from && r.login_date <= to),
+          );
+          setData(filtered);
+        },
+      },
+    );
+  };
+
   useEffect(() => {
-    employeeApi.getByPermission({ emp_id: user?.employee_id })
+    employeeApi.getByPermission({ emp_id: user?.employee_id ?? 0 })
       .then((r) => {
-        setEmployees(r.data.data || []);
-        if (r.data.data?.length === 1) setSelectedEmp(String(r.data.data[0].employee_id));
+        const list = r.data.data || [];
+        setEmployees(list);
+        // Admins/superadmins default to the combined "All Employees" view;
+        // everyone else is scoped to their own attendance.
+        const initial = isAdminView ? ALL_EMPLOYEES : String(user?.employee_id ?? '');
+        setSelectedEmp(initial);
+        runSearch(initial);
       })
       .catch(() => {});
   }, []);
 
-  const empName = employees.find((e) => String(e.employee_id) === selectedEmp)?.name || '';
+  const empName =
+    selectedEmp === ALL_EMPLOYEES
+      ? 'All Employees'
+      : employees.find((e) => String(e.employee_id) === selectedEmp)?.name || '';
 
-  const handleSearch = () => {
-    if (!selectedEmp || !startDate || !endDate) return;
-    viewAttendance.mutate(
-      { emp_id: Number(selectedEmp), start_date: startDate, end_date: endDate, user_id: user?.employee_id || 0 },
-      { onSuccess: (res) => setData(res.data.data || []) },
-    );
-  };
+  const handleSearch = () => runSearch(selectedEmp);
 
   const renderItem = ({ item, index }: { item: any; index: number }) => (
     <View style={[styles.row, index % 2 === 0 && styles.rowEven]}>
       <Text style={[styles.cell, { width: 36 }]}>{index + 1}</Text>
-      <Text style={[styles.cell, { flex: 1 }]} numberOfLines={1}>{item.employee_name}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cell} numberOfLines={1}>{item.employee_name}</Text>
+        {!!item.login_date && <Text style={styles.dateSub}>{formatDate(item.login_date)}</Text>}
+        {item.work_mode === 'remote' && <Text style={styles.remoteTag}>REMOTE</Text>}
+      </View>
       <Text style={[styles.cell, { width: 70 }]}>{item.login_time || '-'}</Text>
       <Text style={[styles.cell, { width: 70 }]}>{item.logout_time || '-'}</Text>
       <Text style={[styles.cell, { width: 60 }]}>{item.total_time || '0'}</Text>
@@ -73,6 +114,10 @@ const ViewAttendanceScreen: React.FC = () => {
             </View>
           }
         >
+          {isAdminView && (
+            <Menu.Item key={ALL_EMPLOYEES} title="All Employees"
+              onPress={() => { setSelectedEmp(ALL_EMPLOYEES); setMenuVisible(false); }} />
+          )}
           {employees.map((e: any) => (
             <Menu.Item key={e.employee_id} title={e.name}
               onPress={() => { setSelectedEmp(String(e.employee_id)); setMenuVisible(false); }} />
@@ -82,13 +127,11 @@ const ViewAttendanceScreen: React.FC = () => {
         <View style={styles.dateRow}>
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={styles.label}>Start Date</Text>
-            <TextInput mode="outlined" value={startDate} onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD" style={styles.dateInput} outlineStyle={styles.outline} />
+            <DatePickerField value={startDate} onChange={setStartDate} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>End Date</Text>
-            <TextInput mode="outlined" value={endDate} onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD" style={styles.dateInput} outlineStyle={styles.outline} />
+            <DatePickerField value={endDate} onChange={setEndDate} />
           </View>
         </View>
 
@@ -140,6 +183,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   rowEven: { backgroundColor: colors.surface },
   cell: { fontSize: 12, color: colors.text, textAlign: 'center' },
+  dateSub: { fontSize: 10, color: colors.textSecondary, textAlign: 'center', marginTop: 2 },
+  remoteTag: {
+    fontSize: 9, fontWeight: '700', color: colors.error, textAlign: 'center',
+    marginTop: 2, letterSpacing: 0.5,
+  },
 });
 
 export default ViewAttendanceScreen;

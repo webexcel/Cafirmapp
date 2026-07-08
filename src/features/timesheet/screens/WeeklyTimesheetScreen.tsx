@@ -13,22 +13,30 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
 import { employeeApi } from '../../../api/employee.api';
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// Monday-first, matching the backend's ISO week (moment isoWeek = Mon–Sun).
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// ISO week number (Mon–Sun), matching the backend's moment().isoWeek(week_id).
 const getWeekNumber = (d: Date) => {
-	const oneJan = new Date(d.getFullYear(), 0, 1);
-	return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getDay() + 1) / 7);
+	const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+	const dayNum = (date.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+	date.setUTCDate(date.getUTCDate() - dayNum + 3); // Thursday of this ISO week
+	const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+	const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
+	firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
+	return 1 + Math.round((date.getTime() - firstThursday.getTime()) / (7 * 86400000));
 };
 
+// Monday-start week dates (YYYY-MM-DD), matching the backend ISO week range.
 const getWeekDates = (d: Date): string[] => {
-	const day = d.getDay();
-	const sunday = new Date(d);
-	sunday.setDate(d.getDate() - day);
+	const diffToMon = (d.getDay() + 6) % 7; // days since Monday
+	const monday = new Date(d);
+	monday.setDate(d.getDate() - diffToMon);
 	return DAY_LABELS.map((_, i) => {
-		const date = new Date(sunday);
-		date.setDate(sunday.getDate() + i);
+		const date = new Date(monday);
+		date.setDate(monday.getDate() + i);
 		const yyyy = date.getFullYear();
 		const mm = String(date.getMonth() + 1).padStart(2, '0');
 		const dd = String(date.getDate()).padStart(2, '0');
@@ -36,9 +44,9 @@ const getWeekDates = (d: Date): string[] => {
 	});
 };
 
-const formatDateLabel = (dateStr: string, dayIdx: number): string => {
+const formatDateLabel = (dateStr: string): string => {
 	const d = new Date(dateStr + 'T00:00:00');
-	return `${DAY_FULL[dayIdx]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+	return `${DAY_FULL[(d.getDay() + 6) % 7]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
 };
 
 const formatTimeInput = (text: string): string => {
@@ -70,13 +78,13 @@ interface DayCard {
 	tasks: TaskEntry[];
 }
 
-const WeeklyTimesheetScreen: React.FC = () => {
+const WeeklyTimesheetScreen: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 	const user = useSelector((s: RootState) => s.auth.user);
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [currentDate, setCurrentDate] = useState(new Date());
 	const [dayCards, setDayCards] = useState<DayCard[]>([]);
-	const [expandedDay, setExpandedDay] = useState<number>(new Date().getDay());
+	const [selectedDayIdx, setSelectedDayIdx] = useState<number>((new Date().getDay() + 6) % 7);
 	const initialDataRef = useRef<string>('');
 
 	const [employees, setEmployees] = useState<Employee[]>([]);
@@ -92,8 +100,15 @@ const WeeklyTimesheetScreen: React.FC = () => {
 	useEffect(() => {
 		const loadEmployees = async () => {
 			try {
-				const res = await employeeApi.getAll();
-				const list = res.data.data || [];
+				// Role-scoped: admins/managers get everyone, ordinary employees
+				// get only themselves (backend getEmployeesByPermission rule).
+				const res = await employeeApi.getByPermission({ emp_id: user?.employee_id });
+				let list = res.data.data || [];
+				// getByPermission excludes superadmins from the list; keep the
+				// current user selectable so their own name still shows.
+				if (user && !list.some((e: any) => String(e.employee_id) === String(user.employee_id))) {
+					list = [{ employee_id: user.employee_id, name: user.name }, ...list];
+				}
 				setEmployees(list);
 			} catch {
 				setEmployees([]);
@@ -105,7 +120,7 @@ const WeeklyTimesheetScreen: React.FC = () => {
 	const buildDayCards = useCallback((apiData: any[], dates: string[]): DayCard[] => {
 		return dates.map((date, dayIdx) => {
 			const tasks: TaskEntry[] = apiData.map((item) => {
-				const entry = item.timesheet?.find((t: any) => new Date(t.date).getDay() === dayIdx);
+				const entry = item.timesheet?.find((t: any) => String(t.date).slice(0, 10) === date);
 				return {
 					task_id: item.task_id,
 					task_name: item.task_name,
@@ -120,7 +135,7 @@ const WeeklyTimesheetScreen: React.FC = () => {
 			return {
 				dayIdx,
 				date,
-				label: formatDateLabel(date, dayIdx),
+				label: formatDateLabel(date),
 				tasks,
 			};
 		});
@@ -226,92 +241,11 @@ const WeeklyTimesheetScreen: React.FC = () => {
 		}
 	};
 
-	const toggleAccordion = (dayIdx: number) => {
-		setExpandedDay((prev) => (prev === dayIdx ? -1 : dayIdx));
-	};
-
-	const renderDayCard = ({ item: card, index: dayIdx }: { item: DayCard; index: number }) => {
-		const total = getDayTotal(card.tasks);
-		const taskCount = card.tasks.filter((t) => t.time && t.time !== '00:00').length;
-		const isExpanded = expandedDay === card.dayIdx;
-
-		return (
-			<View style={styles.card}>
-				{/* Date Header - Tappable */}
-				<TouchableOpacity
-					style={[styles.cardHeader, !isExpanded && styles.cardHeaderCollapsed]}
-					onPress={() => toggleAccordion(card.dayIdx)}
-					activeOpacity={0.7}
-				>
-					<View style={styles.dateIconBox}>
-						<Icon name="calendar" size={18} color={colors.primary} />
-					</View>
-					<View style={styles.dateInfo}>
-						<Text style={styles.dateLabel}>{card.label}</Text>
-						<Text style={styles.taskCount}>
-							{taskCount} {taskCount === 1 ? 'task' : 'tasks'}
-							{total ? `  •  ${total}` : ''}
-						</Text>
-					</View>
-					{total ? (
-						<View style={styles.totalBadge}>
-							<Text style={styles.totalText}>{total}</Text>
-						</View>
-					) : null}
-					<Icon
-						name={isExpanded ? 'chevron-up' : 'chevron-down'}
-						size={22}
-						color={colors.textSecondary}
-						style={styles.chevron}
-					/>
-				</TouchableOpacity>
-
-				{/* Task Entries - Collapsible */}
-				{isExpanded && (
-					<View style={styles.taskEntries}>
-						{card.tasks.map((task, taskIdx) => (
-							<View key={task.task_id} style={[styles.taskRow, taskIdx < card.tasks.length - 1 && styles.taskRowBorder]}>
-								<View style={styles.taskHeader}>
-									<Icon name="clipboard-text-outline" size={14} color={colors.accent} />
-									<Text style={styles.taskName} numberOfLines={1}>{task.task_name}</Text>
-									{task.service_short_name || task.service_name ? (
-										<Text style={styles.taskService} numberOfLines={1}>
-											{task.service_short_name || task.service_name}
-										</Text>
-									) : null}
-								</View>
-								<View style={styles.inputRow}>
-									<TextInput
-										style={styles.timeInput}
-										value={task.time}
-										placeholder="00:00"
-										placeholderTextColor={colors.disabled}
-										keyboardType="numeric"
-										maxLength={5}
-										onChangeText={(text) => {
-											const formatted = formatTimeInput(text);
-											updateTaskField(card.dayIdx, taskIdx, 'time', formatted);
-										}}
-									/>
-									<TextInput
-										style={styles.descInput}
-										value={task.description}
-										placeholder="Description"
-										placeholderTextColor={colors.disabled}
-										onChangeText={(text) => updateTaskField(card.dayIdx, taskIdx, 'description', text)}
-									/>
-								</View>
-							</View>
-						))}
-					</View>
-				)}
-			</View>
-		);
-	};
+	const selectedCard = dayCards[selectedDayIdx];
 
 	return (
 		<View style={styles.flex}>
-			<AppHeader title="Weekly Timesheet" showBack showDrawer={false} />
+			{!embedded && <AppHeader title="Weekly Timesheet" showBack showDrawer={false} />}
 
 			{/* Employee Selector */}
 			<View style={styles.empSelector}>
@@ -363,23 +297,90 @@ const WeeklyTimesheetScreen: React.FC = () => {
 				</Button>
 			</View>
 
+			{/* Day selector chips */}
+			<View style={styles.dayChips}>
+				{dayCards.map((card, idx) => {
+					const active = selectedDayIdx === idx;
+					const hasEntries = card.tasks.some((t) => t.time && t.time !== '00:00');
+					const dateNum = card.date.split('-')[2];
+					return (
+						<TouchableOpacity
+							key={card.date}
+							style={[styles.dayChip, active && styles.dayChipActive]}
+							onPress={() => setSelectedDayIdx(idx)}
+							activeOpacity={0.7}
+						>
+							<Text style={[styles.dayChipLabel, active && styles.dayChipTextActive]}>
+								{DAY_LABELS[idx][0]}
+							</Text>
+							<Text style={[styles.dayChipDate, active && styles.dayChipTextActive]}>{dateNum}</Text>
+							<View style={[styles.dayDot, hasEntries && styles.dayDotOn, active && hasEntries && styles.dayDotOnActive]} />
+						</TouchableOpacity>
+					);
+				})}
+			</View>
+
 			{loading ? (
 				<View style={styles.loader}>
 					<ActivityIndicator size="large" color={colors.primary} />
 				</View>
-			) : dayCards.length === 0 || dayCards.every((c) => c.tasks.length === 0) ? (
+			) : !selectedCard ? (
 				<EmptyState icon="calendar-blank-outline" title="No data" subtitle="No timesheet entries for this week" />
 			) : (
 				<KeyboardAvoidingView
 					style={styles.flex}
 					behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				>
-					<FlatList
-						data={dayCards}
-						keyExtractor={(item) => item.date}
-						renderItem={renderDayCard}
-						contentContainerStyle={styles.listContent}
-					/>
+					{/* Selected day header */}
+					<View style={styles.dayHeader}>
+						<Text style={styles.dayHeaderLabel}>{selectedCard.label}</Text>
+						{getDayTotal(selectedCard.tasks) ? (
+							<View style={styles.totalBadge}>
+								<Text style={styles.totalText}>{getDayTotal(selectedCard.tasks)}</Text>
+							</View>
+						) : null}
+					</View>
+
+					{selectedCard.tasks.length === 0 ? (
+						<EmptyState icon="clipboard-text-outline" title="No tasks" subtitle="No tasks for this day" />
+					) : (
+						<ScrollView contentContainerStyle={styles.dayContent} keyboardShouldPersistTaps="handled">
+							{selectedCard.tasks.map((task, taskIdx) => (
+								<View key={task.task_id} style={styles.taskCard}>
+									<View style={styles.taskHeader}>
+										<Icon name="clipboard-text-outline" size={14} color={colors.accent} />
+										<Text style={styles.taskName} numberOfLines={1}>{task.task_name}</Text>
+										{task.service_short_name || task.service_name ? (
+											<Text style={styles.taskService} numberOfLines={1}>
+												{task.service_short_name || task.service_name}
+											</Text>
+										) : null}
+									</View>
+									<View style={styles.inputRow}>
+										<TextInput
+											style={styles.timeInput}
+											value={task.time}
+											placeholder="00:00"
+											placeholderTextColor={colors.disabled}
+											keyboardType="numeric"
+											maxLength={5}
+											onChangeText={(text) =>
+												updateTaskField(selectedDayIdx, taskIdx, 'time', formatTimeInput(text))
+											}
+										/>
+										<TextInput
+											style={styles.descInput}
+											value={task.description}
+											placeholder="Description"
+											placeholderTextColor={colors.disabled}
+											onChangeText={(text) => updateTaskField(selectedDayIdx, taskIdx, 'description', text)}
+										/>
+									</View>
+								</View>
+							))}
+						</ScrollView>
+					)}
+
 					{isDirty() && (
 						<View style={styles.saveBar}>
 							<Button
@@ -443,6 +444,81 @@ const styles = StyleSheet.create({
 	},
 	weekLabel: { fontSize: 15, fontWeight: '600', color: colors.text, marginHorizontal: 8 },
 	loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+	dayChips: {
+		flexDirection: 'row',
+		backgroundColor: colors.surface,
+		paddingHorizontal: 8,
+		paddingVertical: 10,
+		borderBottomWidth: 1,
+		borderBottomColor: colors.border,
+	},
+	dayChip: {
+		flex: 1,
+		alignItems: 'center',
+		paddingVertical: 8,
+		marginHorizontal: 3,
+		borderRadius: 10,
+		backgroundColor: colors.background,
+	},
+	dayChipActive: {
+		backgroundColor: colors.primary,
+	},
+	dayChipLabel: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: colors.textSecondary,
+	},
+	dayChipDate: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: colors.text,
+		marginTop: 2,
+	},
+	dayChipTextActive: {
+		color: '#FFF',
+	},
+	dayDot: {
+		width: 5,
+		height: 5,
+		borderRadius: 3,
+		marginTop: 4,
+		backgroundColor: 'transparent',
+	},
+	dayDotOn: {
+		backgroundColor: colors.accent,
+	},
+	dayDotOnActive: {
+		backgroundColor: '#FFF',
+	},
+	dayHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 4,
+	},
+	dayHeaderLabel: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: colors.text,
+	},
+	dayContent: {
+		padding: 16,
+		paddingTop: 8,
+		paddingBottom: 100,
+	},
+	taskCard: {
+		backgroundColor: colors.surface,
+		borderRadius: 12,
+		padding: 14,
+		marginBottom: 10,
+		elevation: 1,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.06,
+		shadowRadius: 3,
+	},
 	listContent: {
 		padding: 16,
 		paddingBottom: 100,

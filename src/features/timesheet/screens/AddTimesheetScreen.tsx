@@ -4,9 +4,12 @@ import { Text, TextInput, Button, Menu } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../../theme';
+import { SCREEN } from '../../../constants/routes';
 import AppHeader from '../../../components/AppHeader';
 import OverlayLoader from '../../../components/OverlayLoader';
+import { SectionCard, TimesheetRow } from '../../../components/three60';
 import { useTimesheets } from '../hooks/useTimesheet';
 import { employeeApi } from '../../../api/employee.api';
 import { taskApi } from '../../../api/task.api';
@@ -22,8 +25,27 @@ const schema = yup.object({
 });
 
 const AddTimesheetScreen: React.FC = () => {
-  const { addMutation } = useTimesheets();
+  const { addMutation, list } = useTimesheets();
+  const navigation = useNavigation<any>();
   const user = useSelector((s: RootState) => s.auth.user);
+
+  // Admins/managers (role 1 or 2) see everyone's data; ordinary employees see
+  // only their own. Matches the backend getEmployeesByPermission rule.
+  const isPrivileged = user?.role === 1 || user?.role === 2;
+
+  // Last 20 added timesheets, most recent first (scoped by role).
+  const recent = React.useMemo(() => {
+    let rows = [...(list.data || [])];
+    if (!isPrivileged) {
+      rows = rows.filter((r: any) => String(r.employee_id) === String(user?.employee_id));
+    }
+    rows.sort((a, b) => {
+      const av = a.created_at || a.time_sheet_id || a.timesheet_id || 0;
+      const bv = b.created_at || b.time_sheet_id || b.timesheet_id || 0;
+      return av < bv ? 1 : av > bv ? -1 : 0;
+    });
+    return rows.slice(0, 20);
+  }, [list.data, isPrivileged, user?.employee_id]);
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -144,6 +166,27 @@ const AddTimesheetScreen: React.FC = () => {
           contentStyle={{ height: 48 }} labelStyle={{ fontWeight: '600' }}>
           Add Timesheet
         </Button>
+
+        <Button mode="outlined" icon="calendar-week"
+          onPress={() => navigation.navigate(SCREEN.VIEW_TIMESHEET)}
+          style={styles.weeklyBtn} contentStyle={{ height: 48 }}
+          textColor={colors.primary} labelStyle={{ fontWeight: '600' }}>
+          View Weekly Timesheet
+        </Button>
+
+        <View style={styles.recentSection}>
+          <SectionCard
+            title="Recent Timesheets"
+            icon="clock-outline"
+            count={recent.length}
+            empty={recent.length === 0}
+            emptyText={list.isLoading ? 'Loading…' : 'No timesheets added yet'}
+          >
+            {recent.map((t: any, i: number) => (
+              <TimesheetRow key={t.time_sheet_id ?? t.timesheet_id ?? i} ts={t} showEmployee />
+            ))}
+          </SectionCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -163,6 +206,8 @@ const styles = StyleSheet.create({
   },
   dropdownText: { fontSize: 14, color: colors.text },
   submitBtn: { marginTop: 24, borderRadius: 8, backgroundColor: colors.primary },
+  weeklyBtn: { marginTop: 12, borderRadius: 8, borderColor: colors.primary },
+  recentSection: { marginTop: 24 },
 });
 
 export default AddTimesheetScreen;

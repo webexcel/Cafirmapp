@@ -15,6 +15,8 @@ export const SCREEN = {
   EMPLOYEE_LIST: 'EmployeeList',
   CREATE_EMPLOYEE: 'CreateEmployee',
   EMPLOYEE_PROFILE: 'EmployeeProfile',
+  EMPLOYEE_360_LIST: 'Employee360List',
+  EMPLOYEE_360: 'Employee360',
 
   // Client
   CLIENT_LIST: 'ClientList',

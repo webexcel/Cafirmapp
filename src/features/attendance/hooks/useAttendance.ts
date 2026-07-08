@@ -7,6 +7,7 @@ import type { RootState } from '../../../app/store';
 interface ClockInParams {
   latitude?: number;
   longitude?: number;
+  work_mode?: 'office' | 'remote';
 }
 
 interface ClockOutParams {
@@ -48,11 +49,16 @@ export const useAttendance = (date?: string) => {
         start_date: now.toISOString().split('T')[0],
         ...(params?.latitude != null && { latitude: params.latitude }),
         ...(params?.longitude != null && { longitude: params.longitude }),
+        ...(params?.work_mode && { work_mode: params.work_mode }),
       });
     },
-    onSuccess: () => {
+    onSuccess: (_res, params) => {
       qc.invalidateQueries({ queryKey: ['attendance'] });
-      Toast.show({ type: 'success', text1: 'Logged in' });
+      Toast.show({
+        type: 'success',
+        text1: 'Logged in',
+        ...(params?.work_mode === 'remote' && { text2: 'Recorded as remote (off-site)' }),
+      });
     },
     onError: (error: any) => {
       const msg = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -86,7 +92,8 @@ export const useAttendance = (date?: string) => {
 
 export const useAttendanceByDate = () => {
   const viewAttendance = useMutation({
-    mutationFn: (data: { emp_id: number; start_date: string; end_date: string; user_id: number }) =>
+    // emp_id is "" when an admin/manager requests every employee's attendance.
+    mutationFn: (data: { emp_id: number | string; start_date: string; end_date: string; user_id: number }) =>
       attendanceApi.getByDate(data),
   });
   return { viewAttendance };

@@ -70,9 +70,20 @@ const DrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation }) =>
 
       {/* Menu Items */}
       <ScrollView style={styles.menuList}>
-        {drawerItems.map((item) => (
+        {/* Employee 360 — consolidated per-employee view (admins see everyone) */}
+        <TouchableRipple
+          onPress={() => handleNavigate(SCREEN.EMPLOYEE_360_LIST)}
+          style={styles.menuItem}
+        >
+          <View style={styles.menuItemInner}>
+            <Icon name="badge-account-horizontal-outline" size={22} color={colors.textSecondary} />
+            <Text style={styles.menuLabel}>Employee 360</Text>
+          </View>
+        </TouchableRipple>
+
+        {drawerItems.map((item, index) => (
           <TouchableRipple
-            key={item.screen}
+            key={`${item.screen}-${index}`}
             onPress={() => handleNavigate(item.screen)}
             style={styles.menuItem}
           >

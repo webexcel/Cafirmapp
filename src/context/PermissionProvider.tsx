@@ -43,44 +43,103 @@ export const usePermission = (): PermissionContextType => {
   return context;
 };
 
-// Map parent menu names to MaterialCommunityIcons
+// Map parent menu names (exactly as returned by the permissions API) to
+// MaterialCommunityIcons.
 const iconMap: Record<string, string> = {
   Dashboard: 'view-dashboard-outline',
+  Calender: 'calendar-month-outline',
   'Employee Management': 'account-group-outline',
   'Client Management': 'domain',
-  'Task Management': 'clipboard-check-outline',
-  'Timesheet Management': 'clock-outline',
-  Attendance: 'calendar-check-outline',
+  Task: 'clipboard-check-outline',
+  TimeSheet: 'clock-outline',
+  'Master Details': 'cog-outline',
   Reports: 'chart-bar',
-  'Master Class': 'cog-outline',
   Configuration: 'shield-account-outline',
+  'Attendance Management': 'calendar-check-outline',
   'Document Management': 'file-document-outline',
-  Calendar: 'calendar-month-outline',
 };
 
-// Map submenu names to navigation screens
+// Map parent/submenu names (exactly as returned by the permissions API) to
+// registered navigation targets — either a bottom-tab name (Dashboard, Tasks,
+// Timesheet, Attendance) or a stack screen name (see AppNavigator).
 const screenMap: Record<string, string> = {
+  // Top-level menus without submenus
   Dashboard: 'Dashboard',
-  'Add Employee': 'CreateEmployee',
-  'View Employee': 'EmployeeList',
-  'Add Client': 'CreateClient',
-  'View Client': 'ClientList',
-  'Add Task': 'CreateTask',
-  'View Task': 'TaskList',
-  'Add Timesheet': 'AddTimesheet',
-  'View Timesheet': 'ViewTimesheet',
-  'Weekly Timesheet': 'WeeklyTimesheet',
-  'Activity Tracker': 'ActivityTracker',
-  'View Attendance': 'ViewAttendance',
-  'Employee Report': 'EmployeeReport',
-  'Client Report': 'ClientReport',
-  Services: 'Services',
-  'Client Type': 'ClientTypes',
-  'Document Type': 'DocTypes',
-  'Financial Year': 'FinYear',
+  Calender: 'Dashboard', // no dedicated calendar screen on mobile
+  'Document Management': 'Dashboard', // no dedicated document screen on mobile
+
+  // Employee Management
+  'Create Employee': 'CreateEmployee',
+  'View / Edit Profile': 'EmployeeList',
+  'Create  User Account': 'EmployeeList', // API sends two spaces; no dedicated screen
+
+  // Client Management
+  'Create Clients': 'CreateClient',
+  'View / Edit Profiles': 'ClientList',
+
+  // Task
+  'Create Task': 'CreateTask',
+  'View Task': 'Tasks',
+
+  // TimeSheet
+  'Add TimeSheet': 'Timesheet',
+  'View TimeSheet': 'ViewTimesheet',
+  'Weekly TimeSheet': 'WeeklyTimesheet',
+
+  // Master Details
+  'Create Service': 'Services',
   Roles: 'Roles',
-  Menu: 'MenuConfig',
+  'Create Doc Type': 'DocTypes',
+  'Create Fin Year': 'FinYear',
+  'Create Client Type': 'ClientTypes',
+
+  // Reports
+  'Employee DateWise Report': 'EmployeeReport',
+  'Client DateWise Report': 'ClientReport',
+
+  // Configuration
+  'Add Menu': 'MenuConfig',
   Operations: 'Operations',
+
+  // Attendance Management
+  'Add Attendance': 'Attendance',
+  'View Attendance': 'ViewAttendance',
+};
+
+// Menu items intentionally hidden from the mobile app — these admin/setup
+// features are handled on the web dashboard. Titles match the permissions API
+// exactly (note the two spaces in "Create  User Account"). A parent section
+// whose children are all hidden is dropped automatically.
+const HIDDEN_MENU_TITLES = new Set([
+  'Calender',
+  'Create Employee',
+  'View / Edit Profile',
+  'Create  User Account',
+  'Create Clients',
+  'Create Service',
+  'Roles',
+  'Create Doc Type',
+  'Create Fin Year',
+  'Create Client Type',
+  'Add Menu',
+  'Operations',
+  // Weekly Timesheet is merged into the "View TimeSheet" screen as a tab.
+  'Weekly TimeSheet',
+  // Add TimeSheet is reachable from the Timesheet tab, so hide it from the drawer.
+  'Add TimeSheet',
+  // Tasks are reachable from the bottom "Tasks" tab, so hide them from the drawer.
+  'Create Task',
+  'View Task',
+]);
+
+// Display-label overrides for specific menu items. Only the drawer label
+// changes; screen mapping and permission checks still key off the original
+// API title. The Clients list ("View / Edit Profiles") leads into Client 360;
+// "View TimeSheet" now hosts both the list and weekly views, so it reads
+// simply "Timesheet".
+const MENU_TITLE_OVERRIDES: Record<string, string> = {
+  'View / Edit Profiles': 'Client 360',
+  'View TimeSheet': 'Timesheet',
 };
 
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -109,26 +168,35 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     if (!permissions.length) return;
 
-    const items: MenuItem[] = permissions.map((parent) => {
-      const icon = iconMap[parent.parent_menu] || 'circle-outline';
+    const items: MenuItem[] = permissions
+      .map((parent) => {
+        const icon = iconMap[parent.parent_menu] || 'circle-outline';
 
-      if (parent.submenus && parent.submenus.length > 0) {
+        if (parent.submenus && parent.submenus.length > 0) {
+          return {
+            title: parent.parent_menu,
+            icon,
+            children: parent.submenus
+              .filter((sub) => !HIDDEN_MENU_TITLES.has(sub.submenu))
+              .map((sub) => ({
+                title: MENU_TITLE_OVERRIDES[sub.submenu] || sub.submenu,
+                screen: screenMap[sub.submenu] || 'Dashboard',
+              })),
+          };
+        }
+
         return {
           title: parent.parent_menu,
           icon,
-          children: parent.submenus.map((sub) => ({
-            title: sub.submenu,
-            screen: screenMap[sub.submenu] || 'More',
-          })),
+          screen: screenMap[parent.parent_menu] || 'Dashboard',
         };
-      }
-
-      return {
-        title: parent.parent_menu,
-        icon,
-        screen: screenMap[parent.parent_menu] || 'Dashboard',
-      };
-    });
+      })
+      // Drop hidden top-level items and parent sections whose children were all hidden
+      .filter((item) => {
+        if (HIDDEN_MENU_TITLES.has(item.title)) return false;
+        if (item.children && item.children.length === 0) return false;
+        return true;
+      });
 
     setMenuItems(items);
   }, [permissions]);

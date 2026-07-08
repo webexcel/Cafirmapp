@@ -11,6 +11,8 @@ import DrawerContent from './DrawerContent';
 import EmployeeListScreen from '../features/employee/screens/EmployeeListScreen';
 import CreateEmployeeScreen from '../features/employee/screens/CreateEmployeeScreen';
 import EmployeeProfileScreen from '../features/employee/screens/EmployeeProfileScreen';
+import Employee360ListScreen from '../features/employee/screens/Employee360ListScreen';
+import Employee360Screen from '../features/employee/screens/Employee360Screen';
 
 // Client
 import ClientListScreen from '../features/client/screens/ClientListScreen';
@@ -22,7 +24,7 @@ import CreateTaskScreen from '../features/task/screens/CreateTaskScreen';
 import TaskDetailScreen from '../features/task/screens/TaskDetailScreen';
 
 // Timesheet
-import ViewTimesheetScreen from '../features/timesheet/screens/ViewTimesheetScreen';
+import TimesheetTabsScreen from '../features/timesheet/screens/TimesheetTabsScreen';
 import WeeklyTimesheetScreen from '../features/timesheet/screens/WeeklyTimesheetScreen';
 
 // Attendance
@@ -54,6 +56,8 @@ const MainStack: React.FC = () => (
     <Stack.Screen name={SCREEN.EMPLOYEE_LIST} component={EmployeeListScreen} />
     <Stack.Screen name={SCREEN.CREATE_EMPLOYEE} component={CreateEmployeeScreen} />
     <Stack.Screen name={SCREEN.EMPLOYEE_PROFILE} component={EmployeeProfileScreen} />
+    <Stack.Screen name={SCREEN.EMPLOYEE_360_LIST} component={Employee360ListScreen} />
+    <Stack.Screen name={SCREEN.EMPLOYEE_360} component={Employee360Screen} />
 
     {/* Client */}
     <Stack.Screen name={SCREEN.CLIENT_LIST} component={ClientListScreen} />
@@ -65,7 +69,7 @@ const MainStack: React.FC = () => (
     <Stack.Screen name={SCREEN.TASK_DETAIL} component={TaskDetailScreen} />
 
     {/* Timesheet */}
-    <Stack.Screen name={SCREEN.VIEW_TIMESHEET} component={ViewTimesheetScreen} />
+    <Stack.Screen name={SCREEN.VIEW_TIMESHEET} component={TimesheetTabsScreen} />
     <Stack.Screen name={SCREEN.WEEKLY_TIMESHEET} component={WeeklyTimesheetScreen} />
 
     {/* Attendance */}

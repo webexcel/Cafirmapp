@@ -9,7 +9,7 @@ import EmptyState from '../../../components/EmptyState';
 import { useTimesheets } from '../hooks/useTimesheet';
 import { formatDate } from '../../../utils/dateFormat';
 
-const ViewTimesheetScreen: React.FC = () => {
+const ViewTimesheetScreen: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { list } = useTimesheets();
   const [search, setSearch] = useState('');
 
@@ -48,7 +48,7 @@ const ViewTimesheetScreen: React.FC = () => {
 
   return (
     <View style={styles.flex}>
-      <AppHeader title="View Timesheet" showBack showDrawer={false} />
+      {!embedded && <AppHeader title="View Timesheet" showBack showDrawer={false} />}
       <View style={styles.searchContainer}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search timesheets..." />
       </View>

@@ -1,105 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Text, Button } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import Toast from 'react-native-toast-message';
+import { Text } from 'react-native-paper';
 import { colors } from '../../../theme';
 import AppHeader from '../../../components/AppHeader';
 import EmptyState from '../../../components/EmptyState';
-import OverlayLoader from '../../../components/OverlayLoader';
 import { useAttendance } from '../hooks/useAttendance';
-import { formatDateToYYYYMMDD, formatTimerDisplay } from '../../../utils/dateFormat';
-import { getCurrentLocation, isWithinOffice } from '../../../utils/geolocation';
+import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
 
 const ActivityTrackerScreen: React.FC = () => {
   const today = formatDateToYYYYMMDD(new Date());
-  const { records, todayCheck, clockIn, clockOut } = useAttendance(today);
-
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  const [currentAttId, setCurrentAttId] = useState<number | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    const openRecord = todayCheck.data?.data?.[0];
-    if (openRecord && openRecord.logout_time === null) {
-      setIsActive(true);
-      setCurrentAttId(openRecord.attendance_id);
-    } else {
-      setIsActive(false);
-      setCurrentAttId(null);
-      setTimerSeconds(0);
-    }
-  }, [todayCheck.data]);
-
-  useEffect(() => {
-    if (isActive) {
-      intervalRef.current = setInterval(() => {
-        setTimerSeconds((s) => s + 1);
-      }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isActive]);
-
-  const handleLogin = async () => {
-    let location = null;
-    try {
-      location = await getCurrentLocation();
-    } catch {
-      // geolocation failed
-    }
-    if (!location) {
-      Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to login' });
-      return;
-    }
-    if (!isWithinOffice(location)) {
-      Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to login' });
-      return;
-    }
-    clockIn.mutate(location, {
-      onSuccess: (res) => {
-        setCurrentAttId(res.data.data);
-        setIsActive(true);
-        setTimerSeconds(0);
-      },
-    });
-  };
-
-  const handleLogout = async () => {
-    if (!currentAttId) {
-      Toast.show({ type: 'error', text1: 'No active session found' });
-      return;
-    }
-    let location = null;
-    try {
-      location = await getCurrentLocation();
-    } catch {
-      // geolocation failed
-    }
-    if (!location) {
-      Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to logout' });
-      return;
-    }
-    if (!isWithinOffice(location)) {
-      Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to logout' });
-      return;
-    }
-    clockOut.mutate(
-      { att_id: currentAttId, ...location },
-      {
-        onSuccess: () => {
-          setIsActive(false);
-          setTimerSeconds(0);
-          setCurrentAttId(null);
-          records.refetch();
-        },
-      },
-    );
-  };
+  const { records } = useAttendance(today);
 
   const renderItem = ({ item, index }: { item: any; index: number }) => (
     <View style={[styles.row, index % 2 === 0 && styles.rowEven]}>
@@ -113,33 +23,6 @@ const ActivityTrackerScreen: React.FC = () => {
   return (
     <View style={styles.flex}>
       <AppHeader title="Activity Tracker" />
-      <OverlayLoader visible={clockIn.isPending || clockOut.isPending} />
-
-      {/* Timer Section */}
-      <View style={styles.timerSection}>
-        <View style={styles.timerCircle}>
-          <Icon
-            name={isActive ? 'timer-sand' : 'timer-outline'}
-            size={32}
-            color={isActive ? colors.success : colors.textSecondary}
-          />
-          <Text style={[styles.timerText, isActive && { color: colors.success }]}>
-            {formatTimerDisplay(timerSeconds)}
-          </Text>
-        </View>
-
-        <Button
-          mode="contained"
-          onPress={isActive ? handleLogout : handleLogin}
-          disabled={clockIn.isPending || clockOut.isPending}
-          style={[styles.clockBtn, { backgroundColor: isActive ? colors.error : colors.success }]}
-          contentStyle={{ height: 48 }}
-          labelStyle={{ fontWeight: '600', fontSize: 15 }}
-          icon={isActive ? 'stop-circle-outline' : 'play-circle-outline'}
-        >
-          {clockIn.isPending || clockOut.isPending ? 'Please wait...' : isActive ? 'Logout' : 'Login'}
-        </Button>
-      </View>
 
       {/* Table Header */}
       <View style={styles.tableHeader}>
@@ -166,13 +49,6 @@ const ActivityTrackerScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  timerSection: { alignItems: 'center', paddingVertical: 24, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-  timerCircle: {
-    width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-  },
-  timerText: { fontSize: 22, fontWeight: '700', color: colors.text, marginTop: 4 },
-  clockBtn: { borderRadius: 10, minWidth: 180 },
   tableHeader: {
     flexDirection: 'row', backgroundColor: colors.primary,
     paddingVertical: 10, paddingHorizontal: 16,

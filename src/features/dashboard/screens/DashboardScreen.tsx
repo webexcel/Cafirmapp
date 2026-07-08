@@ -12,7 +12,7 @@ import UserInfoCard from '../components/UserInfoCard';
 import { useDashboard } from '../hooks/useDashboard';
 import { useAttendance } from '../../attendance/hooks/useAttendance';
 import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
-import { getCurrentLocation, isWithinOffice } from '../../../utils/geolocation';
+import { getCurrentLocation, getWorkMode } from '../../../utils/geolocation';
 
 interface MetricDef {
   title: string;
@@ -68,22 +68,15 @@ const DashboardScreen: React.FC = () => {
         Toast.show({ type: 'error', text1: 'No active session found' });
         return;
       }
+      // Log, don't block: capture location best-effort; never block logout.
       let location = null;
       try {
         location = await getCurrentLocation();
       } catch {
-        // geolocation failed
-      }
-      if (!location) {
-        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to logout' });
-        return;
-      }
-      if (!isWithinOffice(location)) {
-        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to logout' });
-        return;
+        // geolocation unavailable — still allow logout
       }
       clockOut.mutate(
-        { att_id: currentAttId, ...location },
+        { att_id: currentAttId, ...(location || {}) },
         {
           onSuccess: () => {
             setIsActive(false);
@@ -93,27 +86,24 @@ const DashboardScreen: React.FC = () => {
         },
       );
     } else {
+      // Log, don't block: tag the login office/remote; never block when off-site.
       let location = null;
       try {
         location = await getCurrentLocation();
       } catch {
-        // geolocation failed
+        // geolocation unavailable — still allow login, recorded as remote
       }
-      if (!location) {
-        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'Location access is required to login' });
-        return;
-      }
-      if (!isWithinOffice(location)) {
-        Toast.show({ type: 'error', text1: 'You are not in office', text2: 'You must be within office premises to login' });
-        return;
-      }
-      clockIn.mutate(location, {
-        onSuccess: (res) => {
-          setCurrentAttId(res.data.data);
-          setIsActive(true);
-          setActiveElapsedSeconds(0);
+      const work_mode = getWorkMode(location);
+      clockIn.mutate(
+        { ...(location || {}), work_mode },
+        {
+          onSuccess: (res) => {
+            setCurrentAttId(res.data.data);
+            setIsActive(true);
+            setActiveElapsedSeconds(0);
+          },
         },
-      });
+      );
     }
   };
 

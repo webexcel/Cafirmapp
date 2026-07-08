@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Text, FAB, IconButton } from 'react-native-paper';
+import { Text, IconButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors } from '../../../theme';
@@ -91,15 +91,6 @@ const ClientListScreen: React.FC = () => {
           list.isLoading ? null : <EmptyState icon="domain" title="No clients found" />
         }
       />
-
-      {flags.showCREATE && (
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={() => navigation.navigate(SCREEN.CREATE_CLIENT)}
-          color="#FFF"
-        />
-      )}
 
       <ConfirmDialog
         visible={!!deleteId}

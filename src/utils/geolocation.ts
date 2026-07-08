@@ -6,6 +6,8 @@ export interface LocationCoords {
 	longitude: number;
 }
 
+export type WorkMode = "office" | "remote";
+
 const OFFICE_LATITUDE = 13.141954;
 const OFFICE_LONGITUDE = 80.249285;
 const OFFICE_RADIUS_METERS = 50;
@@ -48,6 +50,12 @@ export function isWithinOffice(coords: LocationCoords): boolean {
 		OFFICE_LONGITUDE,
 	);
 	return distance <= OFFICE_RADIUS_METERS;
+}
+
+// Classify a login/logout for the "log, don't block" policy: within the office
+// geofence is "office", anywhere else (or an unavailable location) is "remote".
+export function getWorkMode(coords: LocationCoords | null): WorkMode {
+	return coords && isWithinOffice(coords) ? "office" : "remote";
 }
 
 export async function getCurrentLocation(): Promise<LocationCoords | null> {
