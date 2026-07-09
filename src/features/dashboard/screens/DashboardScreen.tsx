@@ -12,6 +12,7 @@ import UserInfoCard from '../components/UserInfoCard';
 import { useDashboard } from '../hooks/useDashboard';
 import { useAttendance } from '../../attendance/hooks/useAttendance';
 import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
+import { isForbidden } from '../../../utils/permissionError';
 import { getCurrentLocation, getWorkMode } from '../../../utils/geolocation';
 
 interface MetricDef {
@@ -30,7 +31,11 @@ const metricDefs: MetricDef[] = [
 const DashboardScreen: React.FC = () => {
   const { metrics, recentTasks, recentTimesheets } = useDashboard();
   const today = formatDateToYYYYMMDD(new Date());
-  const { records, todayCheck, clockIn, clockOut } = useAttendance(today);
+  const { records, todayCheck, clockIn, clockOut, forbidden: attendanceForbidden } = useAttendance(today);
+
+  // Hide widgets the account has no permission for (server returns 403) instead
+  // of showing a permanently-empty/failing card.
+  const timesheetsForbidden = isForbidden(recentTimesheets.error);
 
   const [isActive, setIsActive] = useState(false);
   const [currentAttId, setCurrentAttId] = useState<number | null>(null);
@@ -151,14 +156,16 @@ const DashboardScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Attendance Widget */}
-          <AttendanceWidget
-            isActive={isActive}
-            isLoading={clockIn.isPending || clockOut.isPending}
-            completedSeconds={completedSeconds}
-            activeElapsedSeconds={activeElapsedSeconds}
-            onToggle={handleToggle}
-          />
+          {/* Attendance Widget — hidden when the account lacks attendance permission */}
+          {!attendanceForbidden && (
+            <AttendanceWidget
+              isActive={isActive}
+              isLoading={clockIn.isPending || clockOut.isPending}
+              completedSeconds={completedSeconds}
+              activeElapsedSeconds={activeElapsedSeconds}
+              onToggle={handleToggle}
+            />
+          )}
 
           {/* Recent Tasks */}
           {recentTasks.isLoading ? (
@@ -167,8 +174,8 @@ const DashboardScreen: React.FC = () => {
             <RecentTasks data={recentTasks.data || []} />
           )}
 
-          {/* Recent Timesheets */}
-          {recentTimesheets.isLoading ? (
+          {/* Recent Timesheets — hidden when the account lacks timesheet permission */}
+          {timesheetsForbidden ? null : recentTimesheets.isLoading ? (
             <ActivityIndicator style={styles.sectionLoader} color={colors.primary} />
           ) : (
             <RecentTimesheets data={recentTimesheets.data || []} />

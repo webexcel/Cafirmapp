@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { attendanceApi } from '../../../api/attendance.api';
 import Toast from 'react-native-toast-message';
 import type { RootState } from '../../../app/store';
+import { isForbidden } from '../../../utils/permissionError';
 
 interface ClockInParams {
   latitude?: number;
@@ -20,6 +21,11 @@ export const useAttendance = (date?: string) => {
   const qc = useQueryClient();
   const user = useSelector((state: RootState) => state.auth.user);
 
+  // Stop the 30s polling once we hit a 403 — the account lacks attendance
+  // permission and retrying just spams the server (and the logs).
+  const pollUnlessForbidden = (query: { state: { error: unknown } }) =>
+    isForbidden(query.state.error) ? (false as const) : 30000;
+
   const records = useQuery({
     queryKey: ['attendance', date],
     queryFn: async () => {
@@ -27,7 +33,7 @@ export const useAttendance = (date?: string) => {
       return res.data.data;
     },
     enabled: !!date,
-    refetchInterval: 30000,
+    refetchInterval: pollUnlessForbidden,
   });
 
   const todayCheck = useQuery({
@@ -37,8 +43,11 @@ export const useAttendance = (date?: string) => {
       return res.data;
     },
     enabled: !!user?.employee_id,
-    refetchInterval: 30000,
+    refetchInterval: pollUnlessForbidden,
   });
+
+  // True when the account is not permitted to use attendance at all.
+  const forbidden = isForbidden(records.error) || isForbidden(todayCheck.error);
 
   const clockIn = useMutation({
     mutationFn: (params?: ClockInParams) => {
@@ -87,7 +96,7 @@ export const useAttendance = (date?: string) => {
     },
   });
 
-  return { records, todayCheck, clockIn, clockOut };
+  return { records, todayCheck, clockIn, clockOut, forbidden };
 };
 
 export const useAttendanceByDate = () => {
