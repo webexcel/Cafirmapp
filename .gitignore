@@ -88,3 +88,13 @@ coverage/
 # Temporary files
 *.log
 *.tmp
+
+# Claude Code local state
+.claude/
+
+# Android build output
+android/app/.cxx/
+android/app/src/main/assets/
+
+# Local debug screenshots
+cafirm_*.png
