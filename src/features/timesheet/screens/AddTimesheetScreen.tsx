@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, TextInput, Button, Menu } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -99,12 +99,14 @@ const AddTimesheetScreen: React.FC = () => {
           visible={menuVisible === 'emp'}
           onDismiss={() => setMenuVisible('')}
           anchor={
-            <View style={[styles.dropdownInput, errors.employee && { borderColor: colors.error }]}>
-              <Text style={[styles.dropdownText, !selectedEmp && { color: colors.disabled }]}
-                onPress={() => setMenuVisible('emp')}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.dropdownInput, errors.employee && { borderColor: colors.error }]}
+              onPress={() => setMenuVisible('emp')}>
+              <Text style={[styles.dropdownText, !selectedEmp && { color: colors.disabled }]}>
                 {selectedEmp?.name || 'Select employee'}
               </Text>
-            </View>
+            </TouchableOpacity>
           }
         >
           {employees.map((e: any) => (
@@ -120,12 +122,14 @@ const AddTimesheetScreen: React.FC = () => {
           visible={menuVisible === 'task'}
           onDismiss={() => setMenuVisible('')}
           anchor={
-            <View style={[styles.dropdownInput, errors.task && { borderColor: colors.error }]}>
-              <Text style={[styles.dropdownText, !selectedTask && { color: colors.disabled }]}
-                onPress={() => setMenuVisible('task')}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.dropdownInput, errors.task && { borderColor: colors.error }]}
+              onPress={() => setMenuVisible('task')}>
+              <Text style={[styles.dropdownText, !selectedTask && { color: colors.disabled }]}>
                 {selectedTask ? `${selectedTask.task_name} - ${selectedTask.year_name || ''}` : 'Select task'}
               </Text>
-            </View>
+            </TouchableOpacity>
           }
         >
           {tasks.map((t: any) => (
