@@ -22,7 +22,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response && [401, 403].includes(error.response.status)) {
+    // Only a 401 (authentication failure / expired token) should clear the
+    // session. A 403 means the token is valid but lacks permission for that
+    // specific action — clearing auth here nukes the token and cascades every
+    // subsequent request into a 401, breaking the whole app over one denied call.
+    if (error.response && error.response.status === 401) {
       await clearAuth();
     }
     return Promise.reject(error);
