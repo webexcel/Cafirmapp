@@ -16,4 +16,7 @@ export const timesheetApi = {
 
   updateWeekly: (data: any) =>
     api.post(`${EP.TIMESHEET}/updateWeeklyTimesheet`, { data }),
+
+  getTaskList: (data: { emp_id: number; client_id?: number | ''; service_id?: number | '' }) =>
+    api.post(`${EP.TIMESHEET}/getTaskList`, data),
 };

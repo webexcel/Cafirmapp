@@ -10,9 +10,10 @@ import { SCREEN } from '../../../constants/routes';
 import AppHeader from '../../../components/AppHeader';
 import OverlayLoader from '../../../components/OverlayLoader';
 import { SectionCard, TimesheetRow } from '../../../components/three60';
+import DatePickerField from '../../../components/DatePickerField';
 import { useTimesheets } from '../hooks/useTimesheet';
 import { employeeApi } from '../../../api/employee.api';
-import { taskApi } from '../../../api/task.api';
+import { timesheetApi } from '../../../api/timesheet.api';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../app/store';
 import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
@@ -20,9 +21,21 @@ import { formatDateToYYYYMMDD } from '../../../utils/dateFormat';
 const schema = yup.object({
   employee: yup.string().required('Employee is required'),
   task: yup.string().required('Task is required'),
-  date: yup.string().required('Date is required'),
-  time: yup.string().required('Time is required'),
+  date: yup.string()
+    .required('Date is required')
+    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Enter date as YYYY-MM-DD'),
+  time: yup.string()
+    .required('Time is required')
+    .matches(/^\d{1,2}:[0-5]\d$/, 'Enter time as HH:MM (e.g. 02:30)'),
 });
+
+// Keep only digits, cap at 4 (HHMM), and auto-insert the colon so the field
+// can never hold anything but an HH:MM value.
+const maskTime = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
 
 const AddTimesheetScreen: React.FC = () => {
   const { addMutation, list } = useTimesheets();
@@ -70,11 +83,14 @@ const AddTimesheetScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (watchEmployee) {
-      taskApi.getByClient({ client_id: Number(watchEmployee) })
-        .then((r) => setTasks(r.data.data || []))
-        .catch(() => setTasks([]));
+    if (!watchEmployee) {
+      setTasks([]);
+      return;
     }
+    // Backend matches emp_id against employee_task_mapping with ===, so it must be a number.
+    timesheetApi.getTaskList({ emp_id: Number(watchEmployee) })
+      .then((r) => setTasks(r.data.data || []))
+      .catch(() => setTasks([]));
   }, [watchEmployee]);
 
   const selectedEmp = employees.find((e) => String(e.employee_id) === watchEmployee);
@@ -111,7 +127,11 @@ const AddTimesheetScreen: React.FC = () => {
         >
           {employees.map((e: any) => (
             <Menu.Item key={e.employee_id} title={e.name}
-              onPress={() => { setValue('employee', String(e.employee_id), { shouldValidate: true }); setMenuVisible(''); }} />
+              onPress={() => {
+                setValue('employee', String(e.employee_id), { shouldValidate: true });
+                setValue('task', '');
+                setMenuVisible('');
+              }} />
           ))}
         </Menu>
         {errors.employee && <Text style={styles.error}>{errors.employee.message}</Text>}
@@ -145,9 +165,7 @@ const AddTimesheetScreen: React.FC = () => {
           control={control}
           name="date"
           render={({ field: { onChange, value } }) => (
-            <TextInput mode="outlined" placeholder="YYYY-MM-DD" value={value} onChangeText={onChange}
-              outlineColor={errors.date ? colors.error : colors.border}
-              activeOutlineColor={colors.primary} style={styles.input} outlineStyle={styles.outline} />
+            <DatePickerField value={value} onChange={onChange} />
           )}
         />
         {errors.date && <Text style={styles.error}>{errors.date.message}</Text>}
@@ -158,8 +176,9 @@ const AddTimesheetScreen: React.FC = () => {
           control={control}
           name="time"
           render={({ field: { onChange, value } }) => (
-            <TextInput mode="outlined" placeholder="e.g. 02:30" value={value} onChangeText={onChange}
-              keyboardType="numbers-and-punctuation"
+            <TextInput mode="outlined" placeholder="e.g. 02:30" value={value}
+              onChangeText={(t) => onChange(maskTime(t))}
+              keyboardType="number-pad" maxLength={5}
               outlineColor={errors.time ? colors.error : colors.border}
               activeOutlineColor={colors.primary} style={styles.input} outlineStyle={styles.outline} />
           )}
